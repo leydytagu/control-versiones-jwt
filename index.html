@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Control de versiones y JWT</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background: #f3f4f6;
+        color: #1f2937;
+        margin: 0;
+        padding: 30px 16px;
+      }
+
+      main {
+        max-width: 850px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        text-align: center;
+        color: #1d4ed8;
+      }
+
+      .description {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 20px;
+      }
+
+      section {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px #00000010;
+      }
+
+      h2 {
+        margin-top: 0;
+        font-size: 20px;
+      }
+
+      label {
+        display: block;
+        margin: 14px 0 6px;
+      }
+
+      input {
+        width: 100%;
+        padding: 11px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+      }
+
+      button {
+        width: 100%;
+        padding: 11px;
+        margin-top: 16px;
+        border: 0;
+        border-radius: 6px;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+        font-size: 15px;
+      }
+
+      button:hover {
+        background: #1d4ed8;
+      }
+
+      .secondary {
+        background: #4b5563;
+      }
+
+      #message {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        background: white;
+        padding: 16px;
+        border-radius: 8px;
+        margin-top: 20px;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <h1>Control de versiones y JWT</h1>
+      <p class="description">
+        Proyecto académico de registro, autenticación y control de acceso.
+      </p>
+
+      <div class="container">
+        <section>
+          <h2>Crear cuenta</h2>
+
+          <form id="registerForm">
+            <label for="registerName">Nombre completo</label>
+            <input
+              id="registerName"
+              name="name"
+              type="text"
+              required
+              maxlength="100"
+            />
+
+            <label for="registerEmail">Correo electrónico</label>
+            <input
+              id="registerEmail"
+              name="email"
+              type="email"
+              required
+              maxlength="150"
+            />
+
+            <label for="registerPassword"
+              >Contraseña (mínimo 8 caracteres)</label
+            >
+            <input
+              id="registerPassword"
+              name="password"
+              type="password"
+              required
+              minlength="8"
+              autocomplete="new-password"
+            />
+
+            <button type="submit">Registrarme</button>
+          </form>
+        </section>
+
+        <section>
+          <h2>Iniciar sesión</h2>
+
+          <form id="loginForm">
+            <label for="loginEmail">Correo electrónico</label>
+            <input id="loginEmail" name="email" type="email" required />
+
+            <label for="loginPassword">Contraseña</label>
+            <input
+              id="loginPassword"
+              name="password"
+              type="password"
+              required
+              autocomplete="current-password"
+            />
+
+            <button type="submit">Iniciar sesión</button>
+          </form>
+        </section>
+      </div>
+
+      <section id="sessionSection" class="hidden" style="margin-top: 20px">
+        <h2>Mi sesión</h2>
+        <button id="profileButton">Consultar mi perfil</button>
+        <button id="adminButton" class="secondary">
+          Probar acceso de administrador
+        </button>
+        <button id="logoutButton" class="secondary">Cerrar sesión</button>
+      </section>
+
+      <section style="margin-top: 20px">
+        <h2>Respuesta del servidor</h2>
+        <pre id="message" aria-live="polite">
+Aquí aparecerán los resultados.</pre
+        >
+      </section>
+    </main>
+
+    <script>
+      const message = document.getElementById("message");
+      const sessionSection = document.getElementById("sessionSection");
+
+      function showMessage(data) {
+        message.textContent =
+          typeof data === "string" ? data : JSON.stringify(data, null, 2);
+      }
+
+      async function request(url, options = {}) {
+        try {
+          const response = await fetch(url, options);
+          const data = await response.json();
+
+          showMessage(data);
+
+          if (!response.ok) {
+            throw new Error(data.message || "La solicitud falló.");
+          }
+
+          return data;
+        } catch (error) {
+          showMessage(
+            error.message || "No fue posible conectar con el servidor.",
+          );
+          return null;
+        }
+      }
+
+      document
+        .getElementById("registerForm")
+        .addEventListener("submit", async (event) => {
+          event.preventDefault();
+
+          const payload = {
+            name: document.getElementById("registerName").value.trim(),
+            email: document.getElementById("registerEmail").value.trim(),
+            password: document.getElementById("registerPassword").value,
+          };
+
+          await request("/api/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+        });
+
+      document
+        .getElementById("loginForm")
+        .addEventListener("submit", async (event) => {
+          event.preventDefault();
+
+          const payload = {
+            email: document.getElementById("loginEmail").value.trim(),
+            password: document.getElementById("loginPassword").value,
+          };
+
+          const data = await request("/api/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (data && data.token) {
+            sessionStorage.setItem("token", data.token);
+            sessionSection.classList.remove("hidden");
+            showMessage("Sesión iniciada correctamente.");
+          }
+        });
+
+      async function authenticatedRequest(url) {
+        const token = sessionStorage.getItem("token");
+
+        if (!token) {
+          showMessage("Primero debes iniciar sesión.");
+          return;
+        }
+
+        await request(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
+      document.getElementById("profileButton").addEventListener("click", () => {
+        authenticatedRequest("/api/profile");
+      });
+
+      document.getElementById("adminButton").addEventListener("click", () => {
+        authenticatedRequest("/api/admin");
+      });
+
+      document.getElementById("logoutButton").addEventListener("click", () => {
+        sessionStorage.removeItem("token");
+        sessionSection.classList.add("hidden");
+        showMessage("Sesión cerrada.");
+      });
+    </script>
+  </body>
+</html>
